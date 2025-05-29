@@ -32,6 +32,16 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
+	
+	// PDF Generation
+	implementation("com.itextpdf:itext7-core:7.2.6")
+	implementation("com.itextpdf:kernel:7.2.6")
+	implementation("com.itextpdf:layout:7.2.6")
+	implementation("com.itextpdf:io:7.2.6")
+	
+	// Utilitários
+	implementation("org.apache.commons:commons-lang3:3.14.0")
+	
 	compileOnly("org.projectlombok:lombok")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	runtimeOnly("org.postgresql:postgresql")
