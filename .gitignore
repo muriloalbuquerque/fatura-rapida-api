@@ -38,3 +38,97 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### Logs ###
+logs/
+*.log
+
+### Arquivos de configuração local ###
+application-local.yml
+application-dev.yml
+
+### Arquivos de banco de dados H2 ###
+*.h2.db
+*.lock.db
+*.lobs.db
+
+### Arquivos temporários ###
+tmp/
+temp/
+
+### Arquivos do sistema operacional ###
+.DS_Store
+Thumbs.db
+
+### Arquivos do editor ###
+.idea/
+.vscode/
+*.sublime-*
+
+### Build ###
+/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+### Outros ###
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.idea_modules/
+
+# Arquivos de configuração do Spring Boot
+application.properties
+!src/**/application.properties
+!src/**/application-*.yml
+
+# Arquivos de configuração do Flyway
+/flyway/
+
+# Arquivos de configuração do Docker
+/docker-compose.override.yml
+
+# Arquivos de configuração do Maven (se necessário)
+target/
+
+# Arquivos de configuração do Gradle
+.gradle/
+build/
+!src/**/build/
+
+# Arquivos de configuração do IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Arquivos de configuração do VS Code
+.vscode/
+
+# Arquivos de configuração do Eclipse
+.settings/
+.classpath
+.project
+
+# Arquivos de configuração do NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# Arquivos de configuração do Kotlin
+.kotlin/
+
+# Arquivos de configuração do Spring Boot
+.springBeans
+
+# Arquivos de configuração do STS
+.sts4-cache/
+
+# Arquivos de configuração do Windows
+Thumbs.db
+
+# Arquivos de configuração do Mac
+.DS_Store
