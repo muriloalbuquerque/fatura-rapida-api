@@ -1,83 +1,192 @@
 package com.faturarapida.service
 
-import com.faturarapida.dto.InvoiceRequest
+import com.faturarapida.dto.CreateInvoiceRequest
 import com.faturarapida.dto.InvoiceResponse
 import com.faturarapida.exception.InvoiceGenerationException
+import java.nio.file.Paths
+import com.faturarapida.exception.InvoiceNotFoundException
 import com.faturarapida.model.Invoice
+import com.faturarapida.model.InvoiceStatus
 import com.faturarapida.repository.InvoiceRepository
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.core.io.ByteArrayResource
-import org.springframework.core.io.Resource
+import com.faturarapida.service.storage.StorageService
+import org.slf4j.LoggerFactory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
-import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 import java.time.LocalDate
-import java.util.*
 
+/**
+ * Serviço responsável por gerenciar as operações relacionadas a faturas
+ */
 @Service
 class InvoiceService(
     private val invoiceRepository: InvoiceRepository,
-    private val pdfService: PdfService
+    private val pdfService: PdfService,
+    private val storageService: StorageService
 ) {
+    
+    private val logger = LoggerFactory.getLogger(InvoiceService::class.java)
 
-    @Value("\${app.invoice.directory:invoices}")
-    private lateinit var invoiceDirectory: String
-
+    /**
+     * Cria uma nova fatura
+     * @param request Dados para criação da fatura
+     * @return Dados da fatura criada
+     */
     @Transactional
-    fun criarFatura(request: InvoiceRequest): InvoiceResponse {
+    fun criarFatura(request: CreateInvoiceRequest): InvoiceResponse {
+        logger.info("Criando nova fatura para o cliente: ${request.cliente}")
+        
         try {
-            // Criar dados da fatura para o PDF
+            // 1. Criar dados da fatura para o PDF
             val invoiceData = createInvoiceData(request)
             
-            // Gerar PDF
+            // 2. Gerar PDF
             val pdfBytes = pdfService.generateInvoicePdf(invoiceData)
             
-            // Criar diretório se não existir
-            val directoryPath = Paths.get(invoiceDirectory)
-            if (!Files.exists(directoryPath)) {
-                Files.createDirectories(directoryPath)
-            }
+            // 3. Salvar PDF no armazenamento
+            val pdfFilename = "fatura_${invoiceData.invoiceNumber}.pdf"
+            val pdfPath = storageService.store(pdfBytes, pdfFilename)
             
-            // Gerar nome único para o arquivo
-            val fileName = "fatura_${UUID.randomUUID()}.pdf"
-            val filePath = directoryPath.resolve(fileName)
-            
-            // Salvar PDF
-            Files.write(filePath, pdfBytes)
-            
-            // Criar e salvar a entidade Invoice
+            // 4. Criar e salvar a entidade Invoice
             val invoice = Invoice(
                 cliente = request.cliente,
                 descricao = request.descricao,
                 valor = request.valor,
                 vencimento = request.vencimento,
-                status = "EMITIDA",
-                pdfUrl = filePath.toString()
+                status = InvoiceStatus.EMITIDA,
+                pdfUrl = pdfPath,
+                documentoCliente = request.documentoCliente,
+                enderecoCliente = request.enderecoCliente
             )
             
             val savedInvoice = invoiceRepository.save(invoice)
+            logger.info("Fatura ${savedInvoice.id} criada com sucesso")
             
-            return InvoiceResponse(
-                id = savedInvoice.id,
-                status = savedInvoice.status,
-                pdfUrl = savedInvoice.pdfUrl
-            )
+            return savedInvoice.toResponse()
             
-        } catch (e: IOException) {
-            throw InvoiceGenerationException("Erro ao gerar ou salvar o PDF da fatura", e)
         } catch (e: Exception) {
-            throw InvoiceGenerationException("Erro inesperado ao processar a fatura", e)
+            val errorMsg = "Erro ao criar fatura para o cliente: ${request.cliente}"
+            logger.error(errorMsg, e)
+            throw InvoiceGenerationException(errorMsg, e)
         }
     }
     
-    private fun createInvoiceData(request: InvoiceRequest): PdfService.InvoiceData {
-        // Aqui você pode adicionar lógica para calcular itens, subtotal, impostos, etc.
-        // Este é um exemplo básico
+    /**
+     * Busca uma fatura pelo ID
+     * @param id ID da fatura
+     * @return Fatura encontrada
+     * @throws InvoiceNotFoundException Se a fatura não for encontrada
+     */
+    @Transactional(readOnly = true)
+    fun buscarPorId(id: Long): Invoice {
+        logger.debug("Buscando fatura com ID: $id")
+        return invoiceRepository.findById(id)
+            .orElseThrow { 
+                logger.warn("Fatura com ID $id não encontrada")
+                InvoiceNotFoundException(id) 
+            }
+    }
+    
+    /**
+     * Lista todas as faturas com paginação
+     * @param pageable Configuração de paginação
+     * @return Página de faturas
+     */
+    @Transactional(readOnly = true)
+    fun listarTodas(pageable: Pageable): Page<Invoice> {
+        logger.debug("Listando faturas - página ${pageable.pageNumber}, tamanho ${pageable.pageSize}")
+        return invoiceRepository.findAll(pageable)
+    }
+    
+    /**
+     * Lista faturas por status
+     * @param status Status das faturas a serem listadas
+     * @param pageable Configuração de paginação
+     * @return Página de faturas com o status especificado
+     */
+    @Transactional(readOnly = true)
+    fun listarPorStatus(status: InvoiceStatus, pageable: Pageable): Page<Invoice> {
+        logger.debug("Listando faturas com status: $status")
+        return invoiceRepository.findByStatus(status, pageable)
+    }
+    
+    /**
+     * Atualiza o status de uma fatura
+     * @param id ID da fatura
+     * @param novoStatus Novo status
+     * @return Fatura atualizada
+     */
+    @Transactional
+    fun atualizarStatus(id: Long, novoStatus: InvoiceStatus): InvoiceResponse {
+        logger.info("Atualizando status da fatura $id para $novoStatus")
+        
+        val invoice = buscarPorId(id)
+        val updatedInvoice = invoice.atualizarStatus(novoStatus)
+        
+        val savedInvoice = invoiceRepository.save(updatedInvoice)
+        logger.info("Status da fatura $id atualizado para $novoStatus")
+        
+        return savedInvoice.toResponse()
+    }
+    
+    /**
+     * Verifica e atualiza faturas vencidas
+     * @return Número de faturas atualizadas
+     */
+    @Transactional
+    fun verificarFaturasVencidas(): Int {
+        logger.info("Verificando faturas vencidas")
+        
+        val hoje = LocalDate.now()
+        val faturasVencidas = invoiceRepository.findByVencimentoBeforeAndStatusNot(
+            hoje, 
+            InvoiceStatus.PAGA
+        )
+        
+        if (faturasVencidas.isNotEmpty()) {
+            logger.info("Encontradas ${faturasVencidas.size} faturas vencidas")
+            
+            faturasVencidas.forEach { fatura ->
+                if (fatura.status != InvoiceStatus.VENCIDA) {
+                    fatura.atualizarStatus(InvoiceStatus.VENCIDA)
+                    logger.debug("Fatura ${fatura.id} marcada como vencida")
+                }
+            }
+            
+            invoiceRepository.saveAll(faturasVencidas)
+        }
+        
+        return faturasVencidas.size
+    }
+    
+    /**
+     * Obtém o PDF de uma fatura
+     * @param id ID da fatura
+     * @return Recurso do PDF
+     */
+    @Transactional(readOnly = true)
+    fun obterPdf(id: Long): ByteArray {
+        logger.debug("Solicitado PDF da fatura: $id")
+        
+        val invoice = buscarPorId(id)
+        
+        return try {
+            storageService.loadAsBytes(Paths.get(invoice.pdfUrl).fileName.toString())
+        } catch (e: Exception) {
+            val errorMsg = "Erro ao carregar PDF da fatura: $id"
+            logger.error(errorMsg, e)
+            throw ResponseStatusException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                errorMsg,
+                e
+            )
+        }
+    }
+    
+    private fun createInvoiceData(request: CreateInvoiceRequest): PdfService.InvoiceData {
         val items = listOf(
             PdfService.InvoiceItem(
                 description = request.descricao,
@@ -92,12 +201,12 @@ class InvoiceService(
         val total = subtotal + tax
         
         return PdfService.InvoiceData(
-            invoiceNumber = UUID.randomUUID().toString().substring(0, 8).uppercase(),
+            invoiceNumber = generateInvoiceNumber(),
             issueDate = LocalDate.now(),
             dueDate = request.vencimento,
             clientName = request.cliente,
-            clientDocument = "CPF/CNPJ não informado",
-            clientAddress = "Endereço não informado",
+            clientDocument = request.documentoCliente ?: "Não informado",
+            clientAddress = request.enderecoCliente ?: "Não informado",
             items = items,
             subtotal = subtotal,
             tax = tax,
@@ -105,24 +214,13 @@ class InvoiceService(
         )
     }
     
-    fun listarTodas(): List<Invoice> = invoiceRepository.findAll()
+    private fun generateInvoiceNumber(): String {
+        val date = java.time.LocalDate.now()
+        val randomStr = (1000..9999).random().toString()
+        return "${date.year}${String.format("%02d", date.monthValue)}$randomStr"
+    }
     
-    fun buscarPorId(id: Long): Invoice = 
-        invoiceRepository.findById(id)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Fatura não encontrada") }
-    
-    fun obterPdf(id: Long): Resource {
-        val invoice = buscarPorId(id)
-        return try {
-            val path = Paths.get(invoice.pdfUrl)
-            val resource = ByteArrayResource(Files.readAllBytes(path))
-            resource
-        } catch (e: IOException) {
-            throw ResponseStatusException(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "Erro ao ler o arquivo da fatura",
-                e
-            )
-        }
+    companion object {
+        private const val INVOICE_NUMBER_PREFIX = "INV"
     }
 }

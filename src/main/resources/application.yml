@@ -1,6 +1,9 @@
 app:
   invoice:
     directory: ./invoices  # Diretório onde os PDFs serão salvos
+    file-storage:
+      root-location: ./storage  # Diretório raiz para armazenamento de arquivos
+      create-dirs: true  # Criar diretórios automaticamente
 
 spring:
   datasource:
@@ -16,14 +19,65 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 server:
   port: 8080
   servlet:
     context-path: /api
 
+# Configuração do OpenAPI (Swagger)
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tags-sorter: alpha
+    doc-expansion: none
+    display-query-params: true
+    filter: true
+    default-model-expand-depth: 1
+    default-model-rendering: model
+    default-models-expand-depth: 1
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/*+json
+  show-actuator: true
+  cache:
+    disabled: true
+  model-and-view-allowed: false
+
+# Configuração de agendamento
+task:
+  scheduling:
+    pool:
+      size: 2
+    thread-name-prefix: invoice-scheduler-
+
 logging:
   level:
     root: INFO
     org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     com.faturarapida: DEBUG
+    org.springframework.scheduling: DEBUG
+  file:
+    name: logs/application.log
+    max-size: 10MB
+    max-history: 7
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Configuração de cache (opcional, pode ser ativada conforme necessidade)
+#spring.cache.type: caffeine
+#spring.cache.caffeine.spec: maximumSize=500,expireAfterWrite=300s

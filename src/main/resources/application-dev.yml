@@ -1,0 +1,60 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password: password
+    driver-class-name: org.h2.Driver
+    
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+        jdbc:
+          lob:
+            non_contextual_creation: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+
+  # Desabilitando Flyway para desenvolvimento
+  flyway:
+    enabled: false
+
+# Configuração do armazenamento de arquivos
+app:
+  invoice:
+    directory: ./invoices
+    file-storage:
+      root-location: ./storage
+      create-dirs: true
+
+# Configuração do servidor
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+# Configuração do OpenAPI (Swagger)
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tags-sorter: alpha
+    doc-expansion: none
+    display-query-params: true
+    filter: true
+    default-model-expand-depth: 1
+    default-model-rendering: model
+    default-models-expand-depth: 1
+  default-produces-media-type: application/json

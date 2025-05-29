@@ -1,6 +1,7 @@
 package com.faturarapida.service
 
 import com.itextpdf.kernel.colors.ColorConstants
+import com.itextpdf.kernel.geom.PageSize
 import com.itextpdf.kernel.pdf.PdfDocument
 import com.itextpdf.kernel.pdf.PdfWriter
 import com.itextpdf.layout.Document
@@ -8,14 +9,14 @@ import com.itextpdf.layout.borders.Border
 import com.itextpdf.layout.element.Cell
 import com.itextpdf.layout.element.Paragraph
 import com.itextpdf.layout.element.Table
-import com.itextpdf.layout.property.TextAlignment
-import com.itextpdf.layout.property.UnitValue
+import com.itextpdf.layout.properties.HorizontalAlignment
+import com.itextpdf.layout.properties.TextAlignment
+import com.itextpdf.layout.properties.UnitValue
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import javax.swing.text.Document
 
 @Service
 class PdfService {
@@ -47,7 +48,7 @@ class PdfService {
         val outputStream = ByteArrayOutputStream()
         val writer = PdfWriter(outputStream)
         val pdf = PdfDocument(writer)
-        val document = Document(pdf)
+        val document = Document(pdf, PageSize.A4)
 
         // Configuração da página
         document.setMargins(50f, 36f, 36f, 36f)
@@ -137,7 +138,7 @@ class PdfService {
     private fun addTotalAndFooter(document: Document, data: InvoiceData) {
         val totalTable = Table(2)
             .setWidth(UnitValue.createPercentValue(40f))
-            .setHorizontalAlignment(com.itextpdf.layout.property.HorizontalAlignment.RIGHT)
+            .setHorizontalAlignment(HorizontalAlignment.RIGHT)
             .setMarginBottom(30f)
 
         totalTable.addCell(createCell("Subtotal:", TextAlignment.RIGHT, true))
